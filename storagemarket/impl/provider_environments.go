@@ -8,11 +8,12 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-ipld-prime"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/multiformats/go-multihash"
 	"golang.org/x/xerrors"
 
-	ffi "github.com/filecoin-project/filecoin-ffi"
 	"github.com/filecoin-project/go-address"
-	"github.com/filecoin-project/go-commp-utils/zerocomm"
+	commcid "github.com/filecoin-project/go-fil-commcid"
+	commp "github.com/filecoin-project/go-fil-commp-hashhash"
 	"github.com/filecoin-project/go-multistore"
 	"github.com/filecoin-project/go-state-types/abi"
 
@@ -71,45 +72,25 @@ func (p *providerDealEnvironment) GeneratePieceCommitment(storeID *multistore.St
 		return cid.Undef, "", err
 	}
 
+	// need to pad up!
 	if psize.Padded() < pieceSize {
-		// need to pad up!
-		paddedCid, err := ZeroPadPieceCommitment(pieceCid, psize, pieceSize.Unpadded())
+		dmh, err := multihash.Decode(pieceCid.Hash())
 		if err != nil {
 			return cid.Undef, "", err
 		}
 
-		pieceCid = paddedCid
+		rawPaddedCommP, err := commp.PadCommP(dmh.Digest, uint64(psize.Padded()), uint64(pieceSize))
+		if err != nil {
+			return cid.Undef, "", err
+		}
+
+		pieceCid, err = commcid.DataCommitmentV1ToCID(rawPaddedCommP)
+		if err != nil {
+			return cid.Undef, "", err
+		}
 	}
 
 	return pieceCid, path, nil
-}
-
-// TODO: move this to a proper utility location
-func ZeroPadPieceCommitment(c cid.Cid, curSize abi.UnpaddedPieceSize, toSize abi.UnpaddedPieceSize) (cid.Cid, error) {
-	cur := c
-	for curSize < toSize {
-
-		zc := zerocomm.ZeroPieceCommitment(curSize)
-
-		p, err := ffi.GenerateUnsealedCID(abi.RegisteredSealProof_StackedDrg32GiBV1, []abi.PieceInfo{
-			abi.PieceInfo{
-				Size:     curSize.Padded(),
-				PieceCID: cur,
-			},
-			abi.PieceInfo{
-				Size:     curSize.Padded(),
-				PieceCID: zc,
-			},
-		})
-		if err != nil {
-			return cid.Undef, err
-		}
-
-		cur = p
-		curSize = curSize * 2
-	}
-
-	return cur, nil
 }
 
 func (p *providerDealEnvironment) GeneratePieceReader(storeID *multistore.StoreID, payloadCid cid.Cid, selector ipld.Node) (io.ReadCloser, uint64, error, <-chan error) {
