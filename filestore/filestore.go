@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 )
 
+// 基于本地文件系统的存储
 type fileStore struct {
+	//存储路径
 	base string
 }
 
@@ -26,6 +28,7 @@ func NewLocalFileStore(basedirectory OsPath) (FileStore, error) {
 	return &fileStore{string(base)}, nil
 }
 
+// filename 返回文件路径
 func (fs fileStore) filename(p Path) string {
 	return filepath.Join(fs.base, string(p))
 }
@@ -38,6 +41,7 @@ func (fs fileStore) Open(p Path) (File, error) {
 	return newFile(OsPath(fs.base), p)
 }
 
+// Create 创建一个文件。 其中 p 是文件相对于存储空间的的路径
 func (fs fileStore) Create(p Path) (File, error) {
 	name := fs.filename(p)
 	if _, err := os.Stat(name); err == nil {
@@ -46,6 +50,7 @@ func (fs fileStore) Create(p Path) (File, error) {
 	return newFile(OsPath(fs.base), p)
 }
 
+//Store 存储一个文件
 func (fs fileStore) Store(p Path, src File) (Path, error) {
 	dest, err := fs.Create(p)
 	if err != nil {
@@ -59,12 +64,14 @@ func (fs fileStore) Store(p Path, src File) (Path, error) {
 	return p, dest.Close()
 }
 
+// Delete 删除文件
 func (fs fileStore) Delete(p Path) error {
 	filename := string(p)
 	full := path.Join(string(fs.base), string(filename))
 	return os.Remove(full)
 }
 
+// CreateTemp 创建一个临时文件
 func (fs fileStore) CreateTemp() (File, error) {
 	f, err := ioutil.TempFile(fs.base, "fstmp")
 	if err != nil {

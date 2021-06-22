@@ -3,10 +3,12 @@ package filestore
 import "io"
 
 // Path represents an abstract path to a file
+// 文件相对于存储空间的路径
 type Path string
 
 // OsPath represents a path that can be located on
 // the operating system with standard os.File operations
+// 文件在操作系统的上路径
 type OsPath string
 
 // File is a wrapper around an os file
